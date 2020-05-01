@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:19.08-py3
+FROM nvcr.io/nvidia/pytorch:19.12-py3
 
 # Set working directory
 WORKDIR /workspace
