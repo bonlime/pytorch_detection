@@ -8,24 +8,24 @@ from pytorch_tools.utils.misc import env_world_size
 
 ## original imports
 
-from contextlib import redirect_stdout
-from math import ceil
-import ctypes
-import torch
-from pycocotools.coco import COCO
+# from contextlib import redirect_stdout
+# from math import ceil
+# import ctypes
+# import torch
+# from pycocotools.coco import COCO
 
-import torch
-import ctypes
-import logging
+# import torch
+# import ctypes
+# import logging
 
-import numpy as np
+# import numpy as np
 
-# DALI imports
-from nvidia.dali.pipeline import Pipeline
-import nvidia.dali.ops as ops
-import nvidia.dali.types as types
+# # DALI imports
+# from nvidia.dali.pipeline import Pipeline
+# import nvidia.dali.ops as ops
+# import nvidia.dali.types as types
 
-import time
+# import time
 
 
 DATA_DIR="data/"
@@ -139,40 +139,50 @@ class DaliLoader():
     def __init__(self, path, resize, max_size, batch_size, stride, world, annotations, training=False,
                  rotate_augment=False, augment_brightness=0.0,
                  augment_contrast=0.0, augment_hue=0.0, augment_saturation=0.0):
-        self.training = training
-        self.resize = resize
-        self.max_size = max_size
-        self.stride = stride
-        self.batch_size = batch_size // world
 
-        self.world = world
-        self.path = path
+        
+        self.train = train
+        self.batch_size = batch_size
+        
+        self.pipe = COCOPipeline(train, batch_size, workers, size, max_size)
+        self.pipe.build()
+        # depends on how to launch. TODO: check when everything works
+        # self.batch_size = batch_size // world
+
+        # self.training = training
+        # self.resize = resize
+        # self.max_size = max_size
+        # self.stride = stride
+
+        # self.world = world
+        # self.path = path
 
         # Setup COCO
-        with redirect_stdout(None):
-            self.coco = COCO(annotations)
-        self.ids = list(self.coco.imgs.keys())
-        if 'categories' in self.coco.dataset:
-            self.categories_inv = {k: i for i, k in enumerate(self.coco.getCatIds())}
+        # with redirect_stdout(None):
+            # self.coco = COCO(annotations)
+        # self.ids = list(self.coco.imgs.keys())
+        # if 'categories' in self.coco.dataset:
+            # self.categories_inv = {k: i for i, k in enumerate(self.coco.getCatIds())}
 
-        self.pipe = COCOPipeline(batch_size=self.batch_size, num_threads=2,
-                                 path=path, training=training, annotations=annotations, world=world,
-                                 device_id=torch.cuda.current_device(), mean=self.mean, std=self.std, resize=resize,
-                                 max_size=max_size, stride=self.stride, rotate_augment=rotate_augment,
-                                 augment_brightness=augment_brightness,
-                                 augment_contrast=augment_contrast, augment_hue=augment_hue,
-                                 augment_saturation=augment_saturation)
+        # self.pipe = COCOPipeline(batch_size=self.batch_size, num_threads=2,
+        #                          path=path, training=training, annotations=annotations, world=world,
+        #                          device_id=torch.cuda.current_device(), mean=self.mean, std=self.std, resize=resize,
+        #                          max_size=max_size, stride=self.stride, rotate_augment=rotate_augment,
+        #                          augment_brightness=augment_brightness,
+        #                          augment_contrast=augment_contrast, augment_hue=augment_hue,
+        #                          augment_saturation=augment_saturation)
 
-        self.pipe.build()
 
-    def __repr__(self):
-        return '\n'.join([
-            '    loader: dali',
-            '    resize: {}, max: {}'.format(self.resize, self.max_size),
-        ])
+    # def __repr__(self):
+    #     return '\n'.join([
+    #         '    loader: dali',
+    #         '    resize: {}, max: {}'.format(self.resize, self.max_size),
+    #     ])
 
+    # TODO: somehow get proper len of loader
     def __len__(self):
-        return ceil(len(self.ids) // self.world / self.batch_size)
+        return 100
+    #     return ceil(len(self.ids) // self.world / self.batch_size)
 
     def __iter__(self):
         for _ in range(self.__len__()):
