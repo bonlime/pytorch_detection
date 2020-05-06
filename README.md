@@ -1,42 +1,70 @@
+
+# Get Common Datasets  
+
+This file have instructions on getting various datasets for object detection
+
+## COCO 2017
+Following commands will download and unzip COCO2017 data
+```bash
+curl -O http://images.cocodataset.org/zips/train2017.zip; unzip train2017.zip
+curl -O http://images.cocodataset.org/zips/val2017.zip; unzip val2017.zip
+curl -O http://images.cocodataset.org/annotations/annotations_trainval2017.zip; unzip annotations_trainval2017.zip
+```
+
+
+
+
+
+
 # SSD300 v1.1 For PyTorch
 
 This repository provides a script and recipe to train the SSD300 v1.1 model to achieve state of the art accuracy, and is tested and maintained by NVIDIA.
 
 ## Table Of Contents
-- [Model overview](#model-overview)
-    * [Model architecture](#model-architecture)
-    * [Default configuration](#default-configuration)
-    * [Feature support matrix](#feature-support-matrix)
-        * [Features](#features)
-    * [Mixed precision training](#mixed-precision-training)
-        * [Enabling mixed precision](#enabling-mixed-precision)
-- [Setup](#setup)
-    * [Requirements](#requirements)
-- [Quick Start Guide](#quick-start-guide)
-- [Advanced](#advanced)
-    * [Scripts and sample code](#scripts-and-sample-code)
-    * [Parameters](#parameters)
-    * [Command-line options](#command-line-options)
-    * [Getting the data](#getting-the-data)
-        * [Dataset guidelines](#dataset-guidelines)
-            * [Data preprocessing](#data-preprocessing)
-            * [Data augmentation](#data-augmentation)
-    * [Training process](#training-process)
-    * [Inference process](#inference-process)
-- [Performance](#performance)
-    * [Benchmarking](#benchmarking)
-        * [Training performance benchmark](#training-performance-benchmark)
-        * [Inference performance benchmark](#inference-performance-benchmark)
-    * [Results](#results)
-        * [Training accuracy results](#training-accuracy-results)
-            * [NVIDIA DGX-1 (8x V100 16G)](#nvidia-dgx-1-8x-v100-16g)
-        * [Training performance results](#training-performance-results)
-            * [NVIDIA DGX-1 (8x V100 16G)](#nvidia-dgx-1-8x-v100-16g-1)
-        * [Inference performance results](#inference-performance-results)
-            * [NVIDIA DGX-1 (1x V100 16G)](#nvidia-dgx-1-1x-v100-16g)
-- [Release notes](#release-notes)
-    * [Changelog](#changelog)
-    * [Known issues](#known-issues)
+- [Get Common Datasets](#get-common-datasets)
+  - [COCO 2017](#coco-2017)
+- [SSD300 v1.1 For PyTorch](#ssd300-v11-for-pytorch)
+  - [Table Of Contents](#table-of-contents)
+  - [Model overview](#model-overview)
+    - [Model architecture](#model-architecture)
+    - [Default configuration](#default-configuration)
+    - [Feature support matrix](#feature-support-matrix)
+      - [Features](#features)
+    - [Mixed precision training](#mixed-precision-training)
+      - [Enabling mixed precision](#enabling-mixed-precision)
+    - [Glossary](#glossary)
+  - [Setup](#setup)
+    - [Requirements](#requirements)
+  - [Quick Start Guide](#quick-start-guide)
+  - [Advanced](#advanced)
+    - [Scripts and sample code](#scripts-and-sample-code)
+    - [Parameters](#parameters)
+      - [The script `main.py`](#the-script-mainpy)
+        - [Common parameters](#common-parameters)
+        - [Training related](#training-related)
+        - [Evaluation related](#evaluation-related)
+        - [Utility parameters](#utility-parameters)
+    - [Command-line options](#command-line-options)
+    - [Getting the data](#getting-the-data)
+      - [Dataset guidelines](#dataset-guidelines)
+        - [Data preprocessing](#data-preprocessing)
+        - [Data augmentation](#data-augmentation)
+    - [Training process](#training-process)
+    - [Inference process](#inference-process)
+  - [Performance](#performance)
+    - [Benchmarking](#benchmarking)
+      - [Training performance benchmark](#training-performance-benchmark)
+      - [Inference performance benchmark](#inference-performance-benchmark)
+    - [Results](#results)
+      - [Training accuracy results](#training-accuracy-results)
+        - [NVIDIA DGX-1 (8x V100 16G)](#nvidia-dgx-1-8x-v100-16g)
+      - [Training performance results](#training-performance-results)
+        - [NVIDIA DGX-1 (8x V100 16G)](#nvidia-dgx-1-8x-v100-16g-1)
+      - [Inference performance results](#inference-performance-results)
+        - [NVIDIA DGX-1 (1x V100 16G)](#nvidia-dgx-1-1x-v100-16g)
+  - [Release notes](#release-notes)
+    - [Changelog](#changelog)
+  - [Known issues](#known-issues)
 
 
 ## Model overview
