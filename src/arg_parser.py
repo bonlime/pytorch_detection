@@ -1,8 +1,9 @@
+import os
 from loguru import logger
 import pytorch_tools as pt
 import configargparse as argparse
 
-def make_parser():
+def parse_args():
     parser = argparse.ArgumentParser(
         description="COCO Object Detection Training",
         default_config_files=["configs/base.yaml"],
@@ -12,9 +13,10 @@ def make_parser():
     add_arg = parser.add_argument
 
     ## MODEL
-    add_arg("--backbone", default="resnet18", help="model architecture: (default: resnet18)")
+    add_arg("--arch", default="efficientdet_b0", help="model architecture: (default: resnet18)")
     add_arg("--model_params", type=eval, default={}, help="Additional model params as kwargs")
-
+    add_arg("--weight_standardization", action="store_true", help="Change convs to WS Convs")
+    add_arg("--ema_decay", type=float, default=0, help="If not zero, enables EMA decay for model weights")
 
     ## OPTIMIZER
     add_arg("--optim", type=str, default="SGD", help="Optimizer to use (default: sgd)")
@@ -28,13 +30,11 @@ def make_parser():
     ## DATALOADER
     add_arg("-j", "--workers", default=4, type=int, help="number of data loading workers (default: 4)")
     add_arg(
-        "--mixup", type=float, default=0, help="Alpha for mixup augmentation. If 0 then mixup is diabled",
+        "--mixup", type=float, default=0, help="Alpha for mixup augmentation. If 0 then mixup is disabled",
     )
     add_arg(
-        "--cutmix", type=float, default=0, help="Alpha for cutmix augmentation. If 0 then cutmix is diabled",
+        "--cutmix", type=float, default=0, help="Alpha for cutmix augmentation. If 0 then cutmix is disabled",
     )
-    add_arg("--cutmix_prob", type=float, default=0.5)
-    add_arg("--ctwist", action="store_true", help="Turns on color twist augmentation")
     add_arg("--batch_size", "-bs", type=int, default=8, help="Batch size for training")
     add_arg("--size", type=int, default=512, help="Input size for training")
 
@@ -60,10 +60,10 @@ def make_parser():
     add_arg("--evaluate", "-e", action="store_true", help="Only evaluate model on validation set")
     add_arg(
         "--opt_level",
-        default="O0",
+        default="O1",
         type=str,
         choices=["O0", "O1", "O2", "O3"],
-        help='optimizatin level for apex. (default: "00")',
+        help='optimizatin level for apex. (default: "01")',
     )
 
     ## OTHER
@@ -74,6 +74,8 @@ def make_parser():
         type=int,
         help="Used for multi-process training. Can either be manually set or automatically set by using 'python -m multiproc'.",
     )
+    add_arg("--deterministic", action="store_true")
+
 
     ## LOGGING 
     add_arg("--logdir", default="logs", type=str, help="where logs go")
@@ -87,7 +89,7 @@ def make_parser():
     )
 
     args, not_parsed = parser.parse_known_args()
-    logger.info(f"Not parsed args: {not_parsed}")
+    print(f"Not parsed args: {not_parsed}")
 
     # detect distributed
     args.world_size = pt.utils.misc.env_world_size()
@@ -97,4 +99,5 @@ def make_parser():
     args.is_master = not args.distributed or args.local_rank == 0
     timestamp = pt.utils.misc.get_timestamp()
     args.name = args.name + "_" + timestamp if args.name else timestamp
+    args.outdir = os.path.join(args.logdir, args.name)
     return args
