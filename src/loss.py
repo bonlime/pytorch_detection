@@ -34,6 +34,8 @@ class DetectionLoss(nn.Module):
         cls_t, box_t, matches = self.generate_targets(batch_gt_boxes=target, num_classes=cls_out.size(2))
         # use foreground and background for classification and only foreground for regression
         num_fg = (matches > 0).sum() + 1
+        # TODO: add fg EMA normaizer. https://github.com/open-mmlab/mmdetection/pull/2780
+        # it is said to give additional ~0.5 AP
         cls_loss = self.cls_criterion(cls_out, cls_t)[matches >= 0].sum() / num_fg
         box_loss = self.box_criterion(box_out, box_t)[matches > 0].sum() / num_fg
         loss = cls_loss + self.box_weight * box_loss

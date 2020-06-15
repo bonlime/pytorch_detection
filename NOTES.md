@@ -1,5 +1,5 @@
 TODO:  
-[ ] Working evaluation
+[x] Working evaluation
 [ ] Working train + loss
 
 
@@ -7,8 +7,7 @@ TODO:
 [ ] remove_variables fn - removes first Convs from input. Need to investigate later
 [x] remove bn from wd (!)
 [x] Don't forget to set BN momentum to 1e-2  
-[x] p5 => p6 maybe don't have BN. Check it later   
-[ ] 
+[x] p5 => p6 maybe don't have BN. Check it later
 
 After 21 epochs 
  Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.16663
