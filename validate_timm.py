@@ -172,23 +172,10 @@ def validate(args):
     with torch.no_grad():
         for i, (input, target) in enumerate(loader):
             # output = bench(input, target["img_scale"], target["img_size"])
-
-            class_outputs, box_outputs = bench2.forward(input)
             with torch.no_grad():
-                aspect_ratios = [(1, 1), (1.4, 0.7), (0.7, 1.4)]
-                anchors = box_utils.generate_anchors_boxes(
-                    input.shape[-2:],
-                    # aspect_ratios=aspect_ratios
-                )[0]
-                # anchors = bench.anchors.boxes
-                output2 = box_utils.decode(
-                    class_outputs,
-                    box_outputs,
-                    anchors,
-                    target["img_size"][..., [1, 0]],
-                    img_scales=target["img_scale"],
-                )
+                output2 = bench2.predict(input)
 
+                # rescale to image size and clip
                 output2[..., :4] = box_utils.clip_bboxes_batch(
                     output2[..., :4] * target["img_scale"].view(-1, 1, 1), target["img_size"][..., [1, 0]]
                 )
