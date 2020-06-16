@@ -3,6 +3,7 @@ import pytorch_tools as pt
 from functools import partial
 from pytorch_tools.utils.box import generate_targets
 
+
 class DetectionLoss(nn.Module):
     """Constructs Wrapper for Object Detection which combines Focal Loss and SmoothL1 loss"""
 
@@ -16,8 +17,9 @@ class DetectionLoss(nn.Module):
         matched_iou=0.5,
         unmatched_iou=0.4,
     ):
+        super().__init__()
         self.cls_criterion = pt.losses.FocalLoss(reduction="none", gamma=focal_gamma, alpha=focal_alpha)
-        # TODO: compare to L1 loss. Mmdetection authors say it's better 
+        # TODO: compare to L1 loss. Mmdetection authors say it's better
         self.box_criterion = pt.losses.SmoothL1Loss(delta=huber_delta, reduction="none")
         self.generate_targets = partial(
             generate_targets, anchors=anchors, matched_iou=matched_iou, unmatched_iou=unmatched_iou
@@ -26,7 +28,7 @@ class DetectionLoss(nn.Module):
 
     def forward(self, outputs, target):
         """
-        Args: 
+        Args:
             outputs (Tuple[torch.Tensor]): cls_outputs, box_outputs
             target (torch.Tensor): shape [BS x N x 5]
         """

@@ -1,5 +1,5 @@
 opt_level : O1
 optim : fused_sgd
 phases : [{"ep": 0, "lr": 0, "mom": 0.9}]
-short_epoch: True
-evaluate: True
+# short_epoch: True
+# evaluate: True

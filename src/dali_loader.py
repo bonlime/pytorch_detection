@@ -1,9 +1,10 @@
+import math
 import torch
-import ctypes
 
 from nvidia.dali import ops
 from nvidia.dali import types
 from nvidia.dali.pipeline import Pipeline
+from nvidia.dali.plugin.pytorch import feed_ndarray
 
 from pytorch_tools.utils.misc import env_rank
 from pytorch_tools.utils.misc import env_world_size
@@ -130,11 +131,8 @@ class DaliLoader:
         self.pipe = COCOPipeline(train, batch_size, workers, size)
         self.pipe.build()
 
-    # TODO: somehow get proper len of loader
     def __len__(self):
-        return 100
-
-    #     return ceil(len(self.ids) // self.world / self.batch_size)
+        return math.ceil(next(iter(self.pipe.epoch_size().values())) / self.batch_size)
 
     def __iter__(self):
         for _ in range(self.__len__()):
@@ -143,38 +141,36 @@ class DaliLoader:
             dali_data, dali_boxes, dali_labels, dali_before_pad = self.pipe.run()
 
             for l in range(len(dali_boxes)):
-                num_detections.append(dali_boxes.at(l).shape[0])
+                num_detections.append(dali_boxes[l].shape()[0])
 
             pyt_targets = -1 * torch.ones([len(dali_boxes), max(*num_detections, 1), 5])
 
             for batch in range(self.batch_size):
 
                 # Convert dali tensor to pytorch
-                dali_tensor = dali_data.at(batch)
-
-                datum = torch.zeros(dali_tensor.shape(), dtype=torch.float, device=torch.device("cuda"))
-                c_type_pointer = ctypes.c_void_p(datum.data_ptr())
-                dali_tensor.copy_to_external(c_type_pointer)
+                datum = feed_ndarray(
+                    dali_data[batch],
+                    torch.zeros(dali_data[batch].shape(), dtype=torch.float, device=torch.device("cuda")),
+                )
 
                 # Calculate image resize ratio to rescale boxes
-                resized_size = dali_before_pad.at(batch).shape()[:2]
+                resized_size = dali_before_pad[batch].shape()[:2]
 
                 # Rescale boxes
-                b_arr = dali_boxes.at(batch)
-                num_dets = len(b_arr)
+                pyt_bbox = feed_ndarray(dali_boxes[batch], torch.zeros(dali_boxes[batch].shape()))
+                num_dets = pyt_bbox.size(0)
                 if num_dets > 0:
-                    pyt_bbox = torch.from_numpy(b_arr)
                     pyt_bbox[:, 0::2] *= float(resized_size[1])
                     pyt_bbox[:, 1::2] *= float(resized_size[0])
                     pyt_targets[batch, :num_dets, :4] = pyt_bbox
 
                 # Arrange labels in target tensor
-                l_arr = dali_labels.at(batch)
+                pyt_label = feed_ndarray(
+                    dali_labels[batch], torch.empty(dali_labels[batch].shape(), dtype=torch.int32)
+                )
                 if num_dets > 0:
-                    pyt_label = torch.from_numpy(l_arr).float()
                     pyt_label -= 1  # Rescale labels to [0,79] instead of [1,80]
                     pyt_targets[batch, :num_dets, 4] = pyt_label.squeeze()
-
                 data.append(datum.unsqueeze(0))
 
             data = torch.cat(data, dim=0)

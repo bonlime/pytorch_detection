@@ -172,15 +172,14 @@ def validate(args):
     with torch.no_grad():
         for i, (input, target) in enumerate(loader):
             # output = bench(input, target["img_scale"], target["img_size"])
-            with torch.no_grad():
-                output2 = bench2.predict(input)
+            output2 = bench2.predict(input)
 
-                # rescale to image size and clip
-                output2[..., :4] = box_utils.clip_bboxes_batch(
-                    output2[..., :4] * target["img_scale"].view(-1, 1, 1), target["img_size"][..., [1, 0]]
-                )
-                # xyxy => xywh
-                output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]
+            # rescale to image size and clip
+            output2[..., :4] = box_utils.clip_bboxes_batch(
+                output2[..., :4] * target["img_scale"].view(-1, 1, 1), target["img_size"][..., [1, 0]]
+            )
+            # xyxy => xywh
+            output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]
 
             output = output2
 
