@@ -3,6 +3,7 @@ from loguru import logger
 import pytorch_tools as pt
 import configargparse as argparse
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="COCO Object Detection Training",
@@ -13,7 +14,7 @@ def parse_args():
     add_arg = parser.add_argument
 
     ## MODEL
-    add_arg("--arch", default="efficientdet_b0", help="model architecture: (default: resnet18)")
+    add_arg("--arch", default="efficientdet_d0", help="model architecture: (default: resnet18)")
     add_arg("--model_params", type=eval, default={}, help="Additional model params as kwargs")
     add_arg("--weight_standardization", action="store_true", help="Change convs to WS Convs")
     add_arg("--ema_decay", type=float, default=0, help="If not zero, enables EMA decay for model weights")
@@ -26,7 +27,6 @@ def parse_args():
         "--weight_decay", "--wd", default=1e-4, type=float, metavar="W", help="weight decay (default: 1e-4)",
     )
 
-
     ## DATALOADER
     add_arg("-j", "--workers", default=4, type=int, help="number of data loading workers (default: 4)")
     add_arg(
@@ -37,15 +37,11 @@ def parse_args():
     )
     add_arg("--batch_size", "-bs", type=int, default=8, help="Batch size for training")
     add_arg("--size", type=int, default=512, help="Input size for training")
-
-
-
-    ## CRITERION 
+    ## CRITERION
     add_arg("--focal_alpha", type=float, default=0.25, help="Alpha for focal loss")
     add_arg("--focal_gamma", type=float, default=2, help="Gamma for focal loss")
     add_arg("--huber_delta", type=float, default=0.1, help="Delta for SmoothL1loss")
-    add_arg("--box_weight", )
-
+    add_arg("--box_weight",)
 
     ## TRAINING
     add_arg("--short_epoch", action="store_true", help="make epochs short (for debugging)")
@@ -75,9 +71,7 @@ def parse_args():
         help="Used for multi-process training. Can either be manually set or automatically set by using 'python -m multiproc'.",
     )
     add_arg("--deterministic", action="store_true")
-
-
-    ## LOGGING 
+    ## LOGGING
     add_arg("--logdir", default="logs", type=str, help="where logs go")
     add_arg(
         "-n",
