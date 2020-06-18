@@ -20,7 +20,6 @@ import torch.optim
 import torch.distributed as dist
 
 # for fp16
-from apex import amp
 from apex.parallel import DistributedDataParallel as DDP
 
 import pytorch_tools as pt
@@ -30,10 +29,16 @@ from pytorch_tools.fit_wrapper.callbacks import Callback as NoClbk
 
 from pytorch_tools.utils.misc import listify
 from pytorch_tools.optim import optimizer_from_name
+from pytorch_tools.losses import DetectionLoss
+
 
 from src.dali_loader import DaliLoader
 from src.arg_parser import parse_args
-from src.loss import DetectionLoss
+
+# need to script loss here before entering main to avoid
+# RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
+# FIXME: try to remove after torch 1.6 is released
+# torch.jit.script(DetectionLoss(anchors=torch.rand(16, 4)))
 
 
 def main():
@@ -102,17 +107,18 @@ def main():
         except:  # may raise an error if another optimzer was used or no optimizer in state dict
             logger.info("Failed to load state dict into optimizer")
 
-    ## init mixed precision
-    model, optimizer = amp.initialize(model, optimizer, opt_level=FLAGS.opt_level, verbosity=0)
-
     # Important to create EMA Callback after cuda() and AMP but before DDP wrapper
     ema_clb = pt_clb.ModelEma(model, FLAGS.ema_decay) if FLAGS.ema_decay else NoClbk()
     if FLAGS.distributed:
         model = DDP(model, delay_allreduce=True)
 
-    # define loss function (criterion)
+    ## define loss function (criterion)
     anchors = pt.utils.box.generate_anchors_boxes(FLAGS.size)[0]
-    criterion = DetectionLoss(anchors).cuda()
+    # script loss to lower memory consumption and make it faster
+    # as of 1.5 it does run but loss doesn't decrease for some reason
+    # FIXME: uncomment after 1.6
+    criterion = torch.jit.script(DetectionLoss(anchors).cuda())
+    # criterion = DetectionLoss(anchors).cuda()
 
     model_saver = (
         pt_clb.CheckpointSaver(FLAGS.outdir, save_name="model.chpn") if FLAGS.is_master else NoClbk()
@@ -143,10 +149,12 @@ def main():
         criterion,
         # metrics=[pt.metrics.Accuracy(), pt.metrics.Accuracy(5)],
         callbacks=callbacks,
+        use_fp16=FLAGS.opt_level != "O0",
     )
     if FLAGS.evaluate:
         return None, (42, 42)
         return runner.evaluate(val_loader)
+
     runner.fit(
         train_loader,
         steps_per_epoch=(None, 10)[FLAGS.short_epoch],

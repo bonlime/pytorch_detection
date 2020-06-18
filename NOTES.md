@@ -1,9 +1,9 @@
 TODO:  
 [x] Working evaluation
-[ ] Working train + loss
+[x] Working train + loss
 
 
-[ ] Add Drop Connect in cls and box heads  
+[x] Add Drop Connect in cls and box heads. Upd. Not needed
 [ ] remove_variables fn - removes first Convs from input. Need to investigate later
 [x] remove bn from wd (!)
 [x] Don't forget to set BN momentum to 1e-2  
@@ -225,3 +225,67 @@ Mean of 10 runs 10 iters each BS=16, SZ=512:
 EffDet My 6.63M params
 Mean of 10 runs 10 iters each BS=16, SZ=512:
 	 82.04+-2.18 msecs Forward. 264.38+-7.08 msecs Backward. Max memory: 6748.76Mb. 46.19 imgs/sec
+
+
+
+
+
+
+Initialized models
+EffNetB1 relu 7.79M params
+Mean of 10 runs 10 iters each BS=64, SZ=224:
+   26.62+-0.59 msecs Forward. 136.87+-7.25 msecs Backward. Max memory: 2890.90Mb. 391.46 imgs/sec
+EffNetB1 leaky 7.79M params
+Mean of 10 runs 10 iters each BS=64, SZ=224:
+   27.36+-1.03 msecs Forward. 143.31+-4.86 msecs Backward. Max memory: 2964.88Mb. 374.99 imgs/sec
+EffNetB1 swish 7.79M params
+Mean of 10 runs 10 iters each BS=64, SZ=224:
+   33.23+-1.06 msecs Forward. 174.33+-3.85 msecs Backward. Max memory: 4065.68Mb. 308.34 imgs/sec
+EffNetB1 mish 7.79M params
+Mean of 10 runs 10 iters each BS=64, SZ=224:
+   36.90+-2.59 msecs Forward. 193.96+-8.52 msecs Backward. Max memory: 4154.63Mb. 277.23 imgs/sec
+EffNetB1 mish fast 7.79M params
+Mean of 10 runs 10 iters each BS=64, SZ=224:
+	 53.83+-2.50 msecs Forward. 168.57+-11.89 msecs Backward. Max memory: 3925.55Mb. 287.77 imgs/sec
+
+
+
+
+Optimizing training speed
+Forward only (+reshape inside model)
+EffDet0 My 3.84M params
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 53.73+-3.58 msecs Forward. 178.32+-11.83 msecs Backward. Max memory: 4643.41Mb. 68.95 imgs/sec
+
+w/ loss computation. no grad on targets
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 81.28+-1.90 msecs Forward. 207.80+-7.85 msecs Backward. Max memory: 8604.25Mb. 55.35 imgs/sec
+
+w/ target computation (w/ grad)
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 57.72+-3.53 msecs Forward. 174.95+-7.29 msecs Backward. Max memory: 4998.41Mb. 68.77 imgs/sec
+
+w/ target computation (w/o grad)
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 56.52+-0.97 msecs Forward. 177.37+-5.03 msecs Backward. Max memory: 4998.41Mb. 68.41 imgs/sec
+
+w/ cls loss computation
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 83.07+-1.38 msecs Forward. 184.17+-3.61 msecs Backward. Max memory: 8391.44Mb. 59.87 imgs/sec
+
+w/ box loss
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 60.87+-1.68 msecs Forward. 190.12+-6.32 msecs Backward. Max memory: 5006.06Mb. 63.75 imgs/sec
+
+as you can see focal loss is very memory demanding
+
+return box, calculate both
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 87.02+-2.09 msecs Forward. 183.28+-7.02 msecs Backward. Max memory: 8413.87Mb. 59.19 imgs/sec
+
+return box, calculate both + JIT
+Mean of 10 runs 10 iters each BS=16, SZ=512:
+	 78.18+-2.70 msecs Forward. 180.62+-5.72 msecs Backward. Max memory: 6928.97Mb. 61.82 imgs/sec
+
+
+@Ross code for EffD0 + BS16 requires 9891 Gb speed is about 38-40 img/s
