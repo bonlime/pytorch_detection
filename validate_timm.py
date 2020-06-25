@@ -38,7 +38,7 @@ parser.add_argument(
     "--model",
     "-m",
     metavar="MODEL",
-    default="efficientdet_d1",
+    default="efficientdet_d0",
     help="model architecture (default: tf_efficientdet_d1)",
 )
 parser.add_argument(
@@ -173,11 +173,11 @@ def validate(args):
         for i, (input, target) in enumerate(loader):
             # output = bench(input, target["img_scale"], target["img_size"])
             output2 = bench2.predict(input)
-
             # rescale to image size and clip
-            output2[..., :4] = box_utils.clip_bboxes_batch(
-                output2[..., :4] * target["img_scale"].view(-1, 1, 1), target["img_size"][..., [1, 0]]
-            )
+            output2[..., :4] *= target["img_scale"].view(-1, 1, 1)
+            # works even without clipping
+            # output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
+
             # xyxy => xywh
             output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]
 

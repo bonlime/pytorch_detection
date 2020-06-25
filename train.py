@@ -12,6 +12,7 @@ from pathlib import Path
 from loguru import logger
 from datetime import datetime
 import configargparse as argparse
+from pycocotools.coco import COCO
 
 import torch
 import torch.nn as nn
@@ -34,6 +35,7 @@ from pytorch_tools.losses import DetectionLoss
 
 from src.dali_loader import DaliLoader
 from src.arg_parser import parse_args
+from src.evaluator import CocoEvalClb
 
 # need to script loss here before entering main to avoid
 # RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
@@ -120,12 +122,16 @@ def main():
     criterion = torch.jit.script(DetectionLoss(anchors).cuda())
     # criterion = DetectionLoss(anchors).cuda()
 
+    ## load COCO (needed for evaluation)
+    val_coco_api = COCO("data/annotations/instances_val2017.json")
+
     model_saver = (
         pt_clb.CheckpointSaver(FLAGS.outdir, save_name="model.chpn") if FLAGS.is_master else NoClbk()
     )
     sheduler = pt.fit_wrapper.callbacks.PhasesScheduler(FLAGS.phases)
     # common callbacks
     callbacks = [
+        CocoEvalClb(val_coco_api, anchors),
         sheduler,
         pt_clb.FileLogger(
             FLAGS.outdir, logger=logger

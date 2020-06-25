@@ -1,3 +1,7 @@
+"""
+Here you can find definition of DALI Loader. It's very fast but writing augmentations as a graph is not very
+convenient. Would replace with kornia / albumentation in the future
+"""
 import math
 import torch
 
@@ -9,9 +13,13 @@ from nvidia.dali.plugin.pytorch import feed_ndarray
 from pytorch_tools.utils.misc import env_rank
 from pytorch_tools.utils.misc import env_world_size
 
+from src.coco_ids import COCO_80_TO_90_ARR
+
 DATA_DIR = "data/"
 
-
+# inspired by
+# https://github.com/NVIDIA/retinanet-examples/blob/master/retinanet/dali.py
+# https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Detection/SSD/src/coco_pipeline.py
 class COCOPipeline(Pipeline):
     """COCO Pipeline
     It implements the following augmentation strategy:
@@ -19,9 +27,9 @@ class COCOPipeline(Pipeline):
     
     For training:
         1. crop random part of the image with area in [0.3, 1]
-    For validation: 
+    For validation:
         1. just decode
-    2. scale longest image size to OS 
+    2. scale longest image size to OS
     3. pad image to OS (in case H or W is less)
     """
 
@@ -39,8 +47,8 @@ class COCOPipeline(Pipeline):
             ratio=True,  # want bbox in [0, 1]
             ltrb=True,  #
             random_shuffle=train,
+            save_img_ids=True,  # Need ids for evaluation
             # skip_empty=True # skips images without objects. not sure if we want to do so
-            # save_img_ids=True, # used in RetinaNet repo for some reasons. don't know why
         )
 
         self.bbox_crop = ops.RandomBBoxCrop(
@@ -55,7 +63,9 @@ class COCOPipeline(Pipeline):
         else:
             self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
 
-        self.resize = ops.Resize(device="gpu", interp_type=types.INTERP_CUBIC, resize_longer=size)
+        self.resize = ops.Resize(
+            device="gpu", interp_type=types.INTERP_CUBIC, resize_longer=size, save_attrs=True
+        )
 
         self.bbox_flip = ops.BbFlip(device="cpu", ltrb=True)
         self.img_flip = ops.Flip(device="gpu")
@@ -87,7 +97,7 @@ class COCOPipeline(Pipeline):
         self.train = train
 
     def define_graph(self):
-        images, bboxes, labels = self.input()
+        images, bboxes, labels, img_ids = self.input()
 
         if self.train:
             # crop bbox first and then decode only part of the image
@@ -107,7 +117,7 @@ class COCOPipeline(Pipeline):
             images = self.decode(images)
 
         # resize longest size to size
-        images = self.resize(images)
+        images, attrs = self.resize(images)
 
         # need size before pad to un normalize bboxes lagter
         before_pad = images
@@ -116,7 +126,7 @@ class COCOPipeline(Pipeline):
         images = self.pad(images)
 
         # labels are in ltrb
-        return images, bboxes, labels, before_pad
+        return images, bboxes, labels, before_pad, img_ids, attrs
 
 
 class DaliLoader:
@@ -137,24 +147,31 @@ class DaliLoader:
     def __iter__(self):
         for _ in range(self.__len__()):
 
-            data, num_detections = [], []
-            dali_data, dali_boxes, dali_labels, dali_before_pad = self.pipe.run()
+            data, ratios = [], []
+            dali_data, dali_boxes, dali_labels, dali_before_pad, dali_img_ids, dali_attr = self.pipe.run()
 
-            for l in range(len(dali_boxes)):
-                num_detections.append(dali_boxes[l].shape()[0])
+            # convert images from dali tensors to pytorch
+            data = feed_ndarray(
+                dali_data.as_tensor(),
+                torch.zeros(dali_data.as_tensor().shape(), dtype=torch.float, device=torch.device("cuda")),
+            )
 
-            pyt_targets = -1 * torch.ones([len(dali_boxes), max(*num_detections, 1), 5])
+            max_detections = max(*(dali_boxes[i].shape()[0] for i in range(len(dali_boxes))), 1)
+            pyt_targets = -1 * torch.ones([len(dali_boxes), max_detections, 5])
 
+            # get image ids. only needed for evaluation
+            img_ids = torch.tensor(dali_img_ids.as_array())
+
+            prior_size = dali_attr.as_cpu().as_array()
+
+            # target has different size for each image so need to treat them separately
             for batch in range(self.batch_size):
-
-                # Convert dali tensor to pytorch
-                datum = feed_ndarray(
-                    dali_data[batch],
-                    torch.zeros(dali_data[batch].shape(), dtype=torch.float, device=torch.device("cuda")),
-                )
 
                 # Calculate image resize ratio to rescale boxes
                 resized_size = dali_before_pad[batch].shape()[:2]
+
+                # in this formulation to get true bbox you need to **multiply** prediction by ratio
+                ratios.append(max(prior_size[batch]) / max(resized_size))
 
                 # Rescale boxes
                 pyt_bbox = feed_ndarray(dali_boxes[batch], torch.zeros(dali_boxes[batch].shape()))
@@ -165,15 +182,20 @@ class DaliLoader:
                     pyt_targets[batch, :num_dets, :4] = pyt_bbox
 
                 # Arrange labels in target tensor
-                pyt_label = feed_ndarray(
+                np_label = feed_ndarray(
                     dali_labels[batch], torch.empty(dali_labels[batch].shape(), dtype=torch.int32)
                 )
+                # DALI CocoReader maps existing 90 classes to 80 unique classes. Need to map to 90 again
+                # this is done by indexing numpy array of new (90) labels with old (80) labels
+                pyt_label = torch.tensor(COCO_80_TO_90_ARR[np_label.squeeze().numpy()])
                 if num_dets > 0:
-                    pyt_label -= 1  # Rescale labels to [0,79] instead of [1,80]
-                    pyt_targets[batch, :num_dets, 4] = pyt_label.squeeze()
-                data.append(datum.unsqueeze(0))
+                    pyt_label -= 1  # [0, 90] => [-1, 89]. Removes background
+                    pyt_targets[batch, :num_dets, 4] = pyt_label
 
-            data = torch.cat(data, dim=0)
             pyt_targets = pyt_targets.cuda(non_blocking=True)
+            ratios = torch.tensor(ratios)
 
-            yield data, pyt_targets
+            if self.train:
+                yield data, pyt_targets
+            else:
+                yield data, (pyt_targets, img_ids, ratios)
