@@ -131,21 +131,19 @@ def main():
     sheduler = pt.fit_wrapper.callbacks.PhasesScheduler(FLAGS.phases)
     # common callbacks
     callbacks = [
-        CocoEvalClb(val_coco_api, anchors),
+        pt_clb.StateReduce(),  # MUST go first
         sheduler,
-        pt_clb.FileLogger(
-            FLAGS.outdir, logger=logger
-        ),  # need in every process to be able to sync in DDP mode
         pt_clb.Mixup(FLAGS.mixup, 1000) if FLAGS.mixup else NoClbk(),
         pt_clb.Cutmix(FLAGS.cutmix, 1000) if FLAGS.cutmix else NoClbk(),
         model_saver,  # need to have CheckpointSaver before EMA so moving it here
         ema_clb,  # ModelEMA MUST go after checkpoint saver to work, otherwise it would save main model instead of EMA
+        CocoEvalClbTB(FLAGS.outdir, val_coco_api, anchors),
     ]
     if FLAGS.is_master:  # callback for master process
         master_callbacks = [
             pt_clb.Timer(),
             pt_clb.ConsoleLogger(),
-            pt_clb.TensorBoard(FLAGS.outdir, log_every=25),
+            pt_clb.FileLogger(FLAGS.outdir, logger=logger),
         ]
         callbacks.extend(master_callbacks)
 
@@ -163,7 +161,7 @@ def main():
 
     runner.fit(
         train_loader,
-        steps_per_epoch=(None, 10)[FLAGS.short_epoch],
+        steps_per_epoch=(None, 1)[FLAGS.short_epoch],
         val_loader=val_loader,
         val_steps=(None, 20)[FLAGS.short_epoch],
         epochs=sheduler.tot_epochs,

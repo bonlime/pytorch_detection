@@ -176,7 +176,7 @@ def validate(args):
             # rescale to image size and clip
             output2[..., :4] *= target["img_scale"].view(-1, 1, 1)
             # works even without clipping
-            # output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
+            output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
 
             # xyxy => xywh
             output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]

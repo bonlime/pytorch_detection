@@ -5,7 +5,7 @@ model_params:
     # only needed to test that per epoch val is working. disable for training
     match_tf_same_padding: True
     # want to unfreeze encoder because batch is large enough
-    encoder_norm_layer: abn
+    encoder_norm_layer: frozenabn # abn
     # as in effdet. but need to check that i really have 90 classes not 80 
     num_classes: 90
 short_epoch: True
