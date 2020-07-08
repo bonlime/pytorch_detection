@@ -35,7 +35,7 @@ from pytorch_tools.losses import DetectionLoss
 
 from src.dali_loader import DaliLoader
 from src.arg_parser import parse_args
-from src.evaluator import CocoEvalClb
+from src.evaluator import CocoEvalClbTB
 
 # need to script loss here before entering main to avoid
 # RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
@@ -161,9 +161,9 @@ def main():
 
     runner.fit(
         train_loader,
-        steps_per_epoch=(None, 1)[FLAGS.short_epoch],
+        steps_per_epoch=(None, 10)[FLAGS.short_epoch],
         val_loader=val_loader,
-        val_steps=(None, 20)[FLAGS.short_epoch],
+        # val_steps=(None, 20)[FLAGS.short_epoch],
         epochs=sheduler.tot_epochs,
         # start_epoch=FLAGS.start_epoch, # TODO: maybe want to continue from epoch
     )

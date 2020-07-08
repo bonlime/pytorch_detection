@@ -1,6 +1,8 @@
 import json
 import torch
 import numpy as np
+from copy import deepcopy
+from pycocotools.cocoeval import COCOeval
 
 import pytorch_tools as pt
 from pytorch_tools.utils.box import decode
@@ -63,6 +65,8 @@ class CocoEvalClbTB(pt.fit_wrapper.callbacks.TensorBoard):
 
         for batch in range(res.size(0)):
             for one_res in res[batch]:
+                if one_res[4].tolist() < 0.001:  # stop when below this threshold, scores in descending order
+                    break
                 coco_result = dict(
                     image_id=self.batch_img_ids[batch, 0].tolist(),
                     bbox=one_res[:4].tolist(),
@@ -134,6 +138,8 @@ class CocoEvalClbTB(pt.fit_wrapper.callbacks.TensorBoard):
 
         for m in (self.val_box_loss, self.val_cls_loss):
             self.writer.add_scalar(f"val/{m.name}", m.avg, self.current_step)
+
+        self.reset()
 
     def reset(self):
         self.all_img_ids_set = set()

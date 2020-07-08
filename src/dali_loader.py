@@ -48,7 +48,7 @@ class COCOPipeline(Pipeline):
             ltrb=True,  #
             random_shuffle=train,
             save_img_ids=True,  # Need ids for evaluation
-            # skip_empty=True # skips images without objects. not sure if we want to do so
+            skip_empty=True,  # skips images without objects. not sure if we want to do so
         )
 
         self.bbox_crop = ops.RandomBBoxCrop(

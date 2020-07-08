@@ -24,6 +24,8 @@ from pycocotools.cocoeval import COCOeval
 import pytorch_tools as pt
 import pytorch_tools.utils.box as box_utils
 
+from src.dali_loader import DaliLoader
+
 has_amp = True
 
 
@@ -151,19 +153,19 @@ def validate(args):
     else:
         annotation_path = os.path.join(args.data, "annotations", f"instances_{args.anno}.json")
         image_dir = args.anno
-    dataset = CocoDetection(os.path.join(args.data, image_dir), annotation_path)
+    # dataset = CocoDetection(os.path.join(args.data, image_dir), annotation_path)
 
-    loader = create_loader(
-        dataset,
-        input_size=input_size,
-        batch_size=args.batch_size,
-        use_prefetcher=args.prefetcher,
-        interpolation=args.interpolation,
-        fill_color=args.fill_color,
-        num_workers=args.workers,
-        pin_mem=args.pin_mem,
-    )
-
+    # loader = create_loader(
+    #     dataset,
+    #     input_size=input_size,
+    #     batch_size=args.batch_size,
+    #     use_prefetcher=args.prefetcher,
+    #     interpolation=args.interpolation,
+    #     fill_color=args.fill_color,
+    #     num_workers=args.workers,
+    #     pin_mem=args.pin_mem,
+    # )
+    loader = DaliLoader(False, args.batch_size, args.workers, input_size)
     img_ids = []
     results = []
     bench.eval()
@@ -173,10 +175,13 @@ def validate(args):
         for i, (input, target) in enumerate(loader):
             # output = bench(input, target["img_scale"], target["img_size"])
             output2 = bench2.predict(input)
+
+            _, batch_ids, ratios = target
+            target = {"img_scale": ratios, "img_id": batch_ids}
             # rescale to image size and clip
-            output2[..., :4] *= target["img_scale"].view(-1, 1, 1)
+            output2[..., :4] *= target["img_scale"].view(-1, 1, 1).to(output2)
             # works even without clipping
-            output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
+            # output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
 
             # xyxy => xywh
             output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]
