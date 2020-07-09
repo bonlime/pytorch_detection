@@ -121,31 +121,20 @@ def validate(args):
         args.redundant_bias = not args.no_redundant_bias
 
     # create model
-    bench = create_model(
-        "tf_efficientdet_d1",
-        bench_task="predict",
-        pretrained=args.pretrained,
-        checkpoint_path=args.checkpoint,
-        redundant_bias=args.redundant_bias,
+    bench2 = pt.detection_models.__dict__[args.model](
+        match_tf_same_padding=True, encoder_norm_act="swish_hard"
     )
-    bench = bench.cuda().eval().requires_grad_(False)
-    input_size = bench.config.image_size
-    bench2 = pt.detection_models.__dict__[args.model](match_tf_same_padding=True)
     bench2 = bench2.eval().requires_grad_(False).cuda()
     input_size2 = bench2.pretrained_settings["input_size"]
 
-    param_count = sum([m.numel() for m in bench.parameters()])
+    param_count = sum([m.numel() for m in bench2.parameters()])
     print("Model %s created, param count: %d" % (args.model, param_count))
 
     if has_amp:
         print("Using AMP mixed precision.")
-        # bench = amp.initialize(bench, opt_level='O1')
         bench2 = amp.initialize(bench2, opt_level="O1")
     else:
         print("AMP not installed, running network in FP32.")
-
-    if args.num_gpu > 1:
-        bench = torch.nn.DataParallel(bench, device_ids=list(range(args.num_gpu)))
 
     if "test" in args.anno:
         annotation_path = os.path.join(args.data, "annotations", f"image_info_{args.anno}.json")
@@ -153,7 +142,6 @@ def validate(args):
     else:
         annotation_path = os.path.join(args.data, "annotations", f"instances_{args.anno}.json")
         image_dir = args.anno
-    # dataset = CocoDetection(os.path.join(args.data, image_dir), annotation_path)
 
     # loader = create_loader(
     #     dataset,
@@ -165,15 +153,15 @@ def validate(args):
     #     num_workers=args.workers,
     #     pin_mem=args.pin_mem,
     # )
-    loader = DaliLoader(False, args.batch_size, args.workers, input_size)
+    print(f"Input size: {input_size2[0]}")
+    loader = DaliLoader(False, args.batch_size, args.workers, input_size2[0])
     img_ids = []
     results = []
-    bench.eval()
     batch_time = AverageMeter()
     end = time.time()
+    start_time = time.time()
     with torch.no_grad():
         for i, (input, target) in enumerate(loader):
-            # output = bench(input, target["img_scale"], target["img_size"])
             output2 = bench2.predict(input)
 
             _, batch_ids, ratios = target
@@ -215,11 +203,12 @@ def validate(args):
                 )
             # if i > 10:
             # break
-
+    print(f"Full eval took: {time.time() - start_time:.2f}s")
     json.dump(results, open(args.results, "w"), indent=4)
     if "test" not in args.anno:
-        coco_results = dataset.coco.loadRes(args.results)
-        coco_eval = COCOeval(dataset.coco, coco_results, "bbox")
+        coco_api = COCO("data/annotations/instances_val2017.json")
+        coco_results = coco_api.loadRes(args.results)
+        coco_eval = COCOeval(coco_api, coco_results, "bbox")
         coco_eval.params.imgIds = img_ids  # score only ids we've used
         coco_eval.evaluate()
         coco_eval.accumulate()
