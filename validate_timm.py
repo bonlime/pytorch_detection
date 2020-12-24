@@ -28,7 +28,6 @@ from src.dali_loader import DaliLoader
 
 has_amp = True
 
-
 torch.backends.cudnn.benchmark = True
 
 parser = argparse.ArgumentParser(description="PyTorch ImageNet Validation")
@@ -170,7 +169,6 @@ def validate(args):
             output2[..., :4] *= target["img_scale"].view(-1, 1, 1).to(output2)
             # works even without clipping
             # output2[..., :4] = box_utils.clip_bboxes_batch(output2[..., :4], target["img_size"][..., [1, 0]])
-
             # xyxy => xywh
             output2[..., 2:4] = output2[..., 2:4] - output2[..., :2]
 

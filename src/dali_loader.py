@@ -67,6 +67,9 @@ class COCOPipeline(Pipeline):
             device="gpu", interp_type=types.INTERP_CUBIC, resize_longer=size, save_attrs=True
         )
 
+        self.resize = ops.Resize(device="gpu", interp_type=types.INTERP_CUBIC, resize_longer=size)
+
+
         self.bbox_flip = ops.BbFlip(device="cpu", ltrb=True)
         self.img_flip = ops.Flip(device="gpu")
 
@@ -119,6 +122,7 @@ class COCOPipeline(Pipeline):
         # resize longest size to size
         images, attrs = self.resize(images)
 
+
         # need size before pad to un normalize bboxes lagter
         before_pad = images
         images = self.normalize(images)
@@ -127,6 +131,7 @@ class COCOPipeline(Pipeline):
 
         # labels are in ltrb
         return images, bboxes, labels, before_pad, img_ids, attrs
+
 
 
 class DaliLoader:
@@ -146,7 +151,6 @@ class DaliLoader:
 
     def __iter__(self):
         for _ in range(self.__len__()):
-
             data, ratios = [], []
             dali_data, dali_boxes, dali_labels, dali_before_pad, dali_img_ids, dali_attr = self.pipe.run()
 

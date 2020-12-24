@@ -43,6 +43,12 @@ from src.evaluator import CocoEvalClbTB
 # torch.jit.script(DetectionLoss(anchors=torch.rand(16, 4)))
 
 
+# need to script loss here before entering main to avoid
+# RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
+# FIXME: try to remove after torch 1.6 is released
+# torch.jit.script(DetectionLoss(anchors=torch.rand(16, 4)))
+
+
 def main():
 
     ## get config for this run
