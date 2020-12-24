@@ -12,6 +12,7 @@ from pathlib import Path
 from loguru import logger
 from datetime import datetime
 import configargparse as argparse
+from pycocotools.coco import COCO
 
 import torch
 import torch.nn as nn
@@ -34,6 +35,13 @@ from pytorch_tools.losses import DetectionLoss
 
 from src.dali_loader import DaliLoader
 from src.arg_parser import parse_args
+from src.evaluator import CocoEvalClbTB
+
+# need to script loss here before entering main to avoid
+# RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
+# FIXME: try to remove after torch 1.6 is released
+# torch.jit.script(DetectionLoss(anchors=torch.rand(16, 4)))
+
 
 # need to script loss here before entering main to avoid
 # RuntimeError: Could not get qualified name for class 'stack': __module__ can't be None.
@@ -120,26 +128,28 @@ def main():
     criterion = torch.jit.script(DetectionLoss(anchors).cuda())
     # criterion = DetectionLoss(anchors).cuda()
 
+    ## load COCO (needed for evaluation)
+    val_coco_api = COCO("data/annotations/instances_val2017.json")
+
     model_saver = (
         pt_clb.CheckpointSaver(FLAGS.outdir, save_name="model.chpn") if FLAGS.is_master else NoClbk()
     )
     sheduler = pt.fit_wrapper.callbacks.PhasesScheduler(FLAGS.phases)
     # common callbacks
     callbacks = [
+        pt_clb.StateReduce(),  # MUST go first
         sheduler,
-        pt_clb.FileLogger(
-            FLAGS.outdir, logger=logger
-        ),  # need in every process to be able to sync in DDP mode
         pt_clb.Mixup(FLAGS.mixup, 1000) if FLAGS.mixup else NoClbk(),
         pt_clb.Cutmix(FLAGS.cutmix, 1000) if FLAGS.cutmix else NoClbk(),
         model_saver,  # need to have CheckpointSaver before EMA so moving it here
         ema_clb,  # ModelEMA MUST go after checkpoint saver to work, otherwise it would save main model instead of EMA
+        CocoEvalClbTB(FLAGS.outdir, val_coco_api, anchors),
     ]
     if FLAGS.is_master:  # callback for master process
         master_callbacks = [
             pt_clb.Timer(),
             pt_clb.ConsoleLogger(),
-            pt_clb.TensorBoard(FLAGS.outdir, log_every=25),
+            pt_clb.FileLogger(FLAGS.outdir, logger=logger),
         ]
         callbacks.extend(master_callbacks)
 
@@ -159,7 +169,7 @@ def main():
         train_loader,
         steps_per_epoch=(None, 10)[FLAGS.short_epoch],
         val_loader=val_loader,
-        val_steps=(None, 20)[FLAGS.short_epoch],
+        # val_steps=(None, 20)[FLAGS.short_epoch],
         epochs=sheduler.tot_epochs,
         # start_epoch=FLAGS.start_epoch, # TODO: maybe want to continue from epoch
     )

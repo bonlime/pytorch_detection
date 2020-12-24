@@ -1,3 +1,8 @@
+"""
+This file defines all possible arguments accepted by training script
+I'm using configparser instead of argparse to support running from config
+hacked by @bonlime
+"""
 import os
 from loguru import logger
 import pytorch_tools as pt
